@@ -64,6 +64,10 @@ private:
   double steering_to_servo_gain_, steering_to_servo_offset_;
   double wheelbase_;
   bool publish_tf_;
+  /** Diagonal twist covariance (variance) for EKF fusion; larger vx = trust wheel speed less. */
+  double twist_vx_variance_;
+  double twist_vy_variance_;
+  double twist_wz_variance_;
 
   // odometry state
   double x_, y_, yaw_;

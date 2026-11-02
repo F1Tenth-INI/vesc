@@ -79,8 +79,8 @@ VescDriver::VescDriver(const rclcpp::NodeOptions & options)
 
   // create vesc state (telemetry) publisher
   state_pub_ = create_publisher<VescStateStamped>("sensors/core", rclcpp::QoS{10});
-  imu_pub_ = create_publisher<VescImuStamped>("sensors/imu", rclcpp::QoS{10});
-  imu_std_pub_ = create_publisher<Imu>("sensors/imu/raw", rclcpp::QoS{10});
+  imu_pub_ = create_publisher<VescImuStamped>("vesc/imu/stamped", rclcpp::QoS{10});
+  imu_std_pub_ = create_publisher<Imu>("imu/data", rclcpp::QoS{10});
 
   // since vesc state does not include the servo position, publish the commanded
   // servo position as a "sensor"
@@ -205,18 +205,26 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
     std::shared_ptr<VescPacketImu const> imuData =
       std::dynamic_pointer_cast<VescPacketImu const>(packet);
 
+    // VESC firmware reports IMU linear acceleration in **g**; sensor_msgs/Imu uses **m/s²**.
+    static constexpr double k_imu_accel_g_to_m_s2 = 9.80665;
+    const double ax = imuData->acc_x() * k_imu_accel_g_to_m_s2;
+    const double ay = imuData->acc_y() * k_imu_accel_g_to_m_s2;
+    const double az = imuData->acc_z() * k_imu_accel_g_to_m_s2;
+
     auto imu_msg = VescImuStamped();
     auto std_imu_msg = Imu();
     imu_msg.header.stamp = now();
+    imu_msg.header.frame_id = "vesc/imu";
     std_imu_msg.header.stamp = now();
+    std_imu_msg.header.frame_id = "vesc/imu";
 
     imu_msg.imu.ypr.x = imuData->roll();
     imu_msg.imu.ypr.y = imuData->pitch();
     imu_msg.imu.ypr.z = imuData->yaw();
 
-    imu_msg.imu.linear_acceleration.x = imuData->acc_x();
-    imu_msg.imu.linear_acceleration.y = imuData->acc_y();
-    imu_msg.imu.linear_acceleration.z = imuData->acc_z();
+    imu_msg.imu.linear_acceleration.x = ax;
+    imu_msg.imu.linear_acceleration.y = ay;
+    imu_msg.imu.linear_acceleration.z = az;
 
     imu_msg.imu.angular_velocity.x = imuData->gyr_x();
     imu_msg.imu.angular_velocity.y = imuData->gyr_y();
@@ -231,9 +239,9 @@ void VescDriver::vescPacketCallback(const std::shared_ptr<VescPacket const> & pa
     imu_msg.imu.orientation.y = imuData->q_y();
     imu_msg.imu.orientation.z = imuData->q_z();
 
-    std_imu_msg.linear_acceleration.x = imuData->acc_x();
-    std_imu_msg.linear_acceleration.y = imuData->acc_y();
-    std_imu_msg.linear_acceleration.z = imuData->acc_z();
+    std_imu_msg.linear_acceleration.x = ax;
+    std_imu_msg.linear_acceleration.y = ay;
+    std_imu_msg.linear_acceleration.z = az;
 
     std_imu_msg.angular_velocity.x = imuData->gyr_x();
     std_imu_msg.angular_velocity.y = imuData->gyr_y();

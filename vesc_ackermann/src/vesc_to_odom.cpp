@@ -72,6 +72,9 @@ VescToOdom::VescToOdom(const rclcpp::NodeOptions & options)
   }
 
   publish_tf_ = declare_parameter("publish_tf", publish_tf_);
+  twist_vx_variance_ = declare_parameter("twist_vx_variance", 0.35);
+  twist_vy_variance_ = declare_parameter("twist_vy_variance", 1.0);
+  twist_wz_variance_ = declare_parameter("twist_wz_variance", 0.15);
 
   // create odom publisher
   odom_pub_ = create_publisher<Odometry>("odom", 10);
@@ -99,7 +102,9 @@ void VescToOdom::vescStateCallback(const VescStateStamped::SharedPtr state)
   }
 
   // convert to engineering units
-  double current_speed = (-state->state.speed - speed_to_erpm_offset_) / speed_to_erpm_gain_;
+  // Keep sign consistent with ackermann_to_vesc mapping:
+  // erpm = speed * gain + offset  =>  speed = (erpm - offset) / gain
+  double current_speed = (state->state.speed - speed_to_erpm_offset_) / speed_to_erpm_gain_;
   if (std::fabs(current_speed) < 0.05) {
     current_speed = 0.0;
   }
@@ -157,8 +162,14 @@ void VescToOdom::vescStateCallback(const VescStateStamped::SharedPtr state)
   odom.twist.twist.linear.y = 0.0;
   odom.twist.twist.angular.z = current_angular_velocity;
 
-  // Velocity uncertainty
-  /** @todo Think about velocity uncertainty */
+  // Twist covariance for robot_localization (6x6 row-major: vx, vy, vz, wx, wy, wz)
+  odom.twist.covariance.fill(0.0);
+  odom.twist.covariance[0] = twist_vx_variance_;
+  odom.twist.covariance[7] = twist_vy_variance_;
+  odom.twist.covariance[14] = 1.0e6;  // vz unused in 2D
+  odom.twist.covariance[21] = 1.0e6;
+  odom.twist.covariance[28] = 1.0e6;
+  odom.twist.covariance[35] = twist_wz_variance_;
 
   if (publish_tf_) {
     TransformStamped tf;

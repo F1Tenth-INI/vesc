@@ -609,7 +609,7 @@ double VescPacketImu::yaw() const
 
 double VescPacketImu::acc_x()const
 {
-  return acc_x_;  // g/s
+  return acc_x_;  // g (per VESC IMU packet); convert to m/s² in vesc_driver when publishing Imu
 }
 
 double VescPacketImu::acc_y() const
